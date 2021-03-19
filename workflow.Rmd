@@ -1,0 +1,192 @@
+---
+title: "R_Assignment"
+author: "Kavi R. Acharya"
+date: "March 19, 2021"
+output:
+  word_document: default
+  pdf_document: default
+  html_document: default
+
+## Part I:  Unix assignment in R
+
+Loading the tidyverse package:
+```{r}
+if (!require("tidyverse")) install.packages("tidyverse")
+library(tidyverse)
+
+```
+
+## Downloading the Fang et al and snp files
+
+```{r} 
+# Downloading files directly from the github repository 
+snp<-read_tsv("https://raw.githubusercontent.com/EEOB-BioData/BCB546-Spring2021/main/assignments/UNIX_Assignment/snp_position.txt")
+
+Fang<-read_tsv("https://raw.githubusercontent.com/EEOB-BioData/BCB546-Spring2021/main/assignments/UNIX_Assignment/fang_et_al_genotypes.txt")
+
+```
+## Data Inspection
+
+we can inspect the data fang et al as well as snp datafile using following 
+
+```{r}
+# Load data:
+str(snp)
+unique(genotypes$Group)
+unique(snp$Chromosome)
+nrow(snp)
+ncol(snp)
+```
+
+
+
+### Data Processing
+
+At first we need to rearrange the snp file. SNP file is rearragned so that Chromosome is kept at second column  followed by the position. Then the file is transposed.
+
+```{r}
+# Rearranging the snp file
+snp<-snp[c(1,3,4,2,5:15)]
+
+#Creating subsets of Maize and Teosinte genotype files
+
+Maize.genotype<-Fang %>% filter(Group=="ZMMIL"|Group=="ZMMLR"|Group=="ZMMMR") 
+
+Teosinte.genotype<-Fang %>%filter(Group=="ZMPJA"|Group=="ZMPIL"|Group=="ZMPBA")
+
+
+```
+
+### Now, we transpose the subsets and merge. 
+```{r}
+
+Maize.genotype<-as.data.frame(t(Maize.genotype), stringsAsFactors = F)
+Teosinte.genotype<-as.data.frame(t(Teosinte.genotype), stringsAsFactors = F)
+
+#Here, we are transposing column name intp row name. Then, a new row name is created under SNP_ID. The first row is converted into row name.At last, first three columns are removed.
+SNP_ID <- rownames(Maize.genotype)
+rownames(Maize.genotype) <- NULL
+Maize.genotype <- cbind(SNP_ID,Maize.genotype,stringsAsFactors = FALSE)
+names(Maize.genotype)<-  c("SNP_ID",Maize.genotype[1,-1])
+Maize.genotype <- Maize.genotype[-c(1,2,3), ]
+
+
+SNP_ID <- rownames(Teosinte.genotype)
+rownames(Teosinte.genotype) <- NULL
+Teosinte.genotype <- cbind(SNP_ID,Teosinte.genotype,stringsAsFactors = FALSE)
+names(Teosinte.genotype)<-  c("SNP_ID",Teosinte.genotype[1,-1])
+Teosinte.genotype <- Teosinte.genotype[-c(1,2,3), ]
+
+
+```
+
+Now, we are going to merge the transposed genotype file with snp files
+```{r}
+Merged.maize<-merge(snp, Maize.genotype, by="SNP_ID")
+Merged.teosinte<-merge(snp, Teosinte.genotype, by="SNP_ID")
+```
+We now subset the merged dataset based on Chromosome number, sort it based on position and export it in the form of csv files
+
+```{r}
+#Here, the as.numeric function will give us an error message when there is "unknow/multiple" value. We will replace such value by NA. New column Pos is created and the data is sorted numerically. After sorting, Pos is removed. 
+
+for(i in c(1:10)){
+  data<-Merged.maize %>% filter(Chromosome==i)%>% mutate(Pos=as.numeric(Position))%>%arrange(Pos)
+  data$Pos<-NULL
+  write.csv( data,paste0("Maize_Chromo_",i,"_ascending.csv"), row.names = F)
+  data<-Merged.maize%>% filter(Chromosome==i)%>% mutate(Pos=as.numeric(Position))%>%
+    arrange(-Pos)
+  data$Pos<-NULL
+  data[data=="?/?"]<-"-/-"
+  write.csv( data,paste0("Maize_Chromo_",i,"_descending.csv"), row.names = F)
+  
+  data<-Merged.teosinte %>% filter(Chromosome==i)%>% mutate(Pos=as.numeric(Position))%>%arrange(Pos)
+  data$Pos<-NULL
+  write.csv( data,paste0("Teosinte_Chromo_",i,"_ascending.csv"), row.names = F)
+  data<-Merged.teosinte%>% filter(Chromosome==i)%>% mutate(Pos=as.numeric(Position))%>%
+    arrange(-Pos)
+  data$Pos<-NULL
+  data[data=="?/?"]<-"-/-"
+  write.csv( data,paste0("Teosinte_Chromo_",i,"_descending.csv"), row.names = F)
+  
+}
+
+
+
+```
+
+
+
+
+# Part II
+
+Data Visualization.
+
+### SNPs per chromosome
+We are going to visualize the  number of possible polymorphism in each chromosome.
+
+
+```{r}
+library(ggplot2)
+
+ggplot(data = snp[!is.na(as.numeric(snp$Chromosome)),]) +   geom_bar(mapping = aes(x = as.numeric(Chromosome), fill=Chromosome)) + scale_x_discrete(limit=c(1:10))+ labs(x = "Chromosome number", y="No. of polymorphism position") 
+```
+
+```{r}
+#Traforming the data using pivot_longer. 
+
+Pivot<-Fang %>% pivot_longer(!c(Sample_ID, JG_OTU, Group),names_to="SNP_ID",values_to= "Base")
+Pivot<-merge(Pivot, snp, by="SNP_ID")
+
+ggplot(data = Pivot[!is.na(as.numeric(Pivot$Chromosome)),]) +   geom_bar(mapping = aes(  as.numeric(Chromosome), fill=Group)) + scale_x_discrete(limit=c(1:10))+ labs(x = "Chromosome number", y="No. of SNPS")
+
+
+```
+
+```{r}
+#To see polymorphism in each group
+
+Group_graph <- Pivot %>% 
+  mutate(Chromosome=as.numeric(Chromosome)) %>% #This will mutate Chromosone number into numeric value
+  select(Group, SNP_ID, Chromosome, Base) %>%  #this function will Select required fields
+  filter(Chromosome %in% c(1:10)) %>%  #Filters chromosome 1 to 10
+  filter(Base!="?/?")%>%   #Removes all unknown bases from the file
+  group_by(Group,SNP_ID) %>%  #Grouping by Group and SNP_ID
+  filter(length(unique(Base))>1) %>%   #This removes all SNPs with one base
+  select(Group, SNP_ID, Chromosome) #Selecting three fields
+
+Group_graph<-Group_graph[!duplicated(Group_graph),] #Getting rid of duplication
+
+ggplot(data=Group_graph) +
+  geom_bar(mapping=aes(x=Chromosome, fill=Group)) + 
+  scale_x_discrete(limit=c(1:10), label=c(1:10))
+
+```
+Converting the data into long format
+
+```{r}
+#New column is created on the basis of homozygosity.
+
+Pivot$homozygous<-"Heterozygous"
+Pivot$homozygous[Pivot$Base=="?/?"]<-"Missing"
+Pivot$homozygous[Pivot$Base %in% c("A/A","C/C", "G/G", "T/T")]<-"Homozygous"
+
+# SNPs are grpahed by Sample_ID, filled by Homozygosity:
+ggplot(data=Pivot) +
+  geom_bar(mapping=aes(x=Sample_ID, fill=homozygous), position="fill") 
+# Graph the SNPs by Group, filling by Homozygosity:
+ggplot(data=Pivot) +
+  geom_bar(mapping=aes(x=Group, fill=homozygous), position="fill")
+
+```
+
+To see polymorphism in each group in each chromosome. 
+```{r, fig.width=10,fig.height=11}
+
+Poly<-Pivot[!is.na(as.numeric(Pivot$Chromosome)),]
+Poly$Chromosome<-as.numeric(Poly$Chromosome)
+Poly<-Poly%>% select(SNP_ID, Group, Base, Position, Chromosome, homozygous)%>% filter(Base!="?/?")%>% unique()%>%filter(!is.na(as.numeric(Position)))
+Graph<-ggplot(data = Poly) + geom_point(mapping=aes(x=as.numeric(Position), y=Group, color=homozygous)) +labs(y = "Groups" , x="Chromosome position")
+
+Graph + facet_wrap(~ Chromosome,ncol=2,scales = "free") + labs(color="Genotype")
+```
