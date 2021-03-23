@@ -1,1 +1,26 @@
-Test
+---
+title: "R Assignment Peer Review"
+author: "Mudith Ekanayake"
+date: "3/22/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## First things first! Great job!
+
+* You have done a great job with the assignment. I have a very few comments about the code and the whole assignment.
+
+## Missing some files
+
+In the instructions it is mentioned that we should include three different files;
+    * a README.md file describing its general organization
+    * a separate file in the "R Markdown" format that contains both the code and the description of the workflow, and
+    * an output file in either HTML or PDF format
+I see you have a README file. You just need to update it adding the organization of the repository. You also don't have the html or pdf file. In the top bar, you can see an blue icon saying Knit. So if you click that, you can get the html file. If you need a different format, you can select the output format from the drop down menu of Knit.
+
+## Coding
+
+You have done a great job with the script. It looks nice and ran smoothly without any errors. Your graphs also look great and especially I like your own visualization.
